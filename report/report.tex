@@ -44,6 +44,24 @@
   \item 华泰柏瑞《沪深 300ETF 与股指期货套利》——持有成本模型 / 无套利区间。
 \end{itemize}
 
+\begin{table}[h]\centering\small
+\caption{原研报设定与本文复现口径对照}\label{tab:params}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.6cm}
+                >{\raggedright\arraybackslash}p{4.1cm}
+                >{\raggedright\arraybackslash}p{5.6cm}}
+\toprule
+项目 & 原研报口径 & 本文复现口径 \\
+\midrule
+样本区间 & 各报告区间不同（2016+/2018+/2023+） & 统一使用 2019--2026；IM 从 2022-07-22 上市日起 \\
+现货端 & 固定或动态 ETF，报告间不完全一致 & 固定主 ETF 为主，另给动态 ETF 择优对照 \\
+基差信号 & 基差收敛、分位数阈值、z-score 均值回归 & 三类信号均实现，并加升水/贴水/中性 regime 识别 \\
+记账方式 & 多以报告收益路径为准，合约细节披露有限 & 同时给连续主力近似与逐合约持有至交割严格记账 \\
+融券假设 & 机构可获得融券资源 & 给完全融券、无融券与融券可得性/费率敏感性 \\
+执行成本 & 手续费、冲击与持有成本估计 & 静态成本 + Track A child-order 执行 proxy 回灌 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \noindent\textbf{工具与数据约束（诚实前置）。} 任务要求以 hftbacktest 与 Hummingbot
 复现，但二者与 A 股 ETF 套利存在结构性错配：(1) Hummingbot 仅接 crypto 交易所，
 \textbf{无法直连 SSE/SZSE}；(2) hftbacktest 需事件级 L2，而\textbf{免费、可回溯的
@@ -108,8 +126,10 @@ $r_0/244$ 逐日累计（此处 $r_0$ 用\textbf{原始}基差，不含分红）
 
 \section{复现结果}
 
-\textbf{融券开启情景}（复现报告，有融券资源机构）四品种基差收敛策略全部进入报告区间，
+\textbf{融券开启情景}（复现报告，有融券资源机构）下，连续主力 + 锁定 carry 的报告口径
+四品种基差收敛策略全部进入报告区间，
 多品种复合表现与银河报告高度吻合（表~\ref{tab:main}，图~\ref{fig:comp}、\ref{fig:pair}）。
+严格可执行性则以逐合约持有至交割口径为准（见 §3.3）。
 
 \begin{table}[h]\centering\small
 \caption{基差收敛（conv）策略 vs 报告对照（2019--2026，融券开启，费后）}\label{tab:main}
@@ -202,6 +222,26 @@ IM+1000ETF & \pct{8.1} & \textit{\pct{1.9}} & 1.37  & $-$\pct{3.0} & \pct{57} \\
 \label{fig:acct}
 \end{figure}
 
+\subsection{融券可得性与融券费率敏感性}
+报告复现口径默认反向套利可以做空 ETF；但实际 A 股落地时，融券券源和费率决定了可执行收益。
+表~\ref{tab:shortsens} 将反向套利仓位按融券可得比例缩放，并对该袖珍仓位收取年化融券费。
+结果显示：无融券时复合年化仅 0.2\%；即便完全可融券，若融券费率为 6\%，复合年化也从
+5.6\% 降至 2.8\%。这说明报告收益不是单纯的基差信号收益，而高度依赖融券资源。
+
+\begin{table}[h]\centering\small
+\caption{融券可得性与融券费率敏感性（conv，复合，2019--2026）}\label{tab:shortsens}
+\begin{tabular}{lcccc}
+\toprule
+情景 & 年化收益 & 夏普 & 最大回撤 & 胜率 \\
+\midrule
+无融券 & \pct{0.2} & $-$1.30 & $-$\pct{3.5} & \pct{53} \\
+50\% 可得 / 6\% 融券费 & \pct{1.1} & $-$0.59 & $-$\pct{3.6} & \pct{54} \\
+100\% 可得 / 0\% 融券费 & \pct{5.6} & 1.94 & $-$\pct{3.5} & \pct{60} \\
+100\% 可得 / 6\% 融券费 & \pct{2.8} & 0.45 & $-$\pct{3.6} & \pct{54} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection{Track A：hftbacktest-style 执行撮合 proxy}
 在缺少授权 L2 的约束下，仓库新增 \texttt{trackA\_execution/run\_hftbacktest\_proxy.py}：
 沿用 Track 0 的基差信号，将每次目标仓位变化拆成 8 个 child orders，在合成盘口中模拟
@@ -221,6 +261,16 @@ IM+1000ETF & 109 &  872 & \pct{75} & 3.30 \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+将 Track A child-order 滑点逐日回灌到 Track 0 复合净值后，年化收益从 5.6\% 降至
+4.6\%，夏普从 1.94 降至 1.39，最大回撤从 $-$3.5\% 扩大至 $-$3.7\%。执行成本拖累
+可量化，但该结论仍基于合成盘口，真实 L2 回放应作为下一步验证。
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.84\textwidth]{../figures/fig5_execution_adjusted.png}
+\caption{Track A 执行成本回灌：理论净值（蓝）与执行后净值（红）。}
+\label{fig:execadj}
+\end{figure}
 
 \section{关键发现与诚实局限}
 

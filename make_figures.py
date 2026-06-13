@@ -3,6 +3,7 @@
   fig1_composite_equity.png   — 多品种复合净值 (融券on vs off)
   fig2_pair_equity.png        — 四品种 conv 净值曲线
   fig3_basis_divadj.png       — IF 年化基差: 原始 vs 分红调整
+  fig5_execution_adjusted.png — Track 0 理论净值 vs Track A 执行后净值
 
 Run:  python make_figures.py
 """
@@ -106,7 +107,22 @@ def main() -> None:
     fig.tight_layout(); fig.savefig(FIG / "fig4_accounting_compare.png", dpi=150)
     plt.close(fig)
 
-    print("[saved] fig1..fig4 (composite_equity / pair_equity / basis_divadj / accounting_compare)")
+    # fig5 — execution-adjusted equity if Track A output exists
+    exec_path = ROOT / "results" / "execution_adjusted_daily_short.csv"
+    if exec_path.exists():
+        ex = pd.read_csv(exec_path, parse_dates=["trade_date"]).set_index("trade_date")
+        fig, ax = plt.subplots(figsize=(9, 4.5))
+        ax.plot(_eq(ex["theoretical"]).index, _eq(ex["theoretical"]).values,
+                lw=1.8, color="#2F73C9", label="Track 0 理论净值")
+        ax.plot(_eq(ex["execution_adjusted"]).index, _eq(ex["execution_adjusted"]).values,
+                lw=1.8, color="#E84D3D", label="Track A 执行后净值")
+        ax.axhline(1.0, color="grey", lw=0.6, ls="--")
+        ax.set_title("执行成本回灌: 理论净值 vs 执行后净值 (复合, 融券开启)")
+        ax.set_ylabel("净值"); ax.legend(); ax.grid(alpha=0.25)
+        fig.tight_layout(); fig.savefig(FIG / "fig5_execution_adjusted.png", dpi=150)
+        plt.close(fig)
+
+    print("[saved] fig1..fig5 (composite / pair / basis / accounting / execution-adjusted)")
 
 
 if __name__ == "__main__":
