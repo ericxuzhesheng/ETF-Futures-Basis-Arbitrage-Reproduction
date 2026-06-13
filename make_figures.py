@@ -25,6 +25,7 @@ from config import PAIRS, SIGNALS  # noqa: E402
 from src import data_tushare as dt  # noqa: E402
 from src import basis_model, metrics  # noqa: E402
 from track0_empirical.run_backtest import run_pair, build_composite  # noqa: E402
+from src import contract_backtest  # noqa: E402
 
 FIG = ROOT / "figures"
 FIG.mkdir(exist_ok=True)
@@ -88,7 +89,24 @@ def main() -> None:
     fig.tight_layout(); fig.savefig(FIG / "fig3_basis_divadj.png", dpi=150)
     plt.close(fig)
 
-    print("[saved] figures/fig1_composite_equity.png, fig2_pair_equity.png, fig3_basis_divadj.png")
+    # fig4 — accounting comparison: locked-carry (continuous main) vs per-contract
+    sig = dataclasses.replace(SIGNALS, allow_short_etf=True)
+    locked = pd.concat([run_pair(p, START, None, sig)["_nets"]["conv"] for p in PAIRS],
+                       axis=1).fillna(0).mean(axis=1)
+    perc = pd.concat([contract_backtest.run_pair(p, START, None, sig)["net"] for p in PAIRS],
+                     axis=1).fillna(0).mean(axis=1)
+    fig, ax = plt.subplots(figsize=(9, 4.5))
+    ax.plot(_eq(locked).index, _eq(locked).values, lw=1.8, color="#E84D3D",
+            label="连续主力 + 锁定carry (近似)")
+    ax.plot(_eq(perc).index, _eq(perc).values, lw=1.8, color="#2F73C9",
+            label="逐合约持有至交割 (严格)")
+    ax.axhline(1.0, color="grey", lw=0.6, ls="--")
+    ax.set_title("记账口径对照: 锁定carry近似 vs 逐合约严格 (复合, 融券开启)")
+    ax.set_ylabel("净值"); ax.legend(); ax.grid(alpha=0.25)
+    fig.tight_layout(); fig.savefig(FIG / "fig4_accounting_compare.png", dpi=150)
+    plt.close(fig)
+
+    print("[saved] fig1..fig4 (composite_equity / pair_equity / basis_divadj / accounting_compare)")
 
 
 if __name__ == "__main__":

@@ -85,6 +85,23 @@ IF（同质）近中性，IH（仅 510050）无变化。
 
 复合表现与银河报告（6.6% / 夏普 1.78 / 回撤 −3.4%）高度吻合。
 
+### 🧮 逐合约持有至交割（严格记账）
+
+[`run_contract.py`](track0_empirical/run_contract.py) 用**单一合约内 mark-to-market 持有至
+交割**替代"连续主力 + 锁定 carry"近似：无换月跳价，终值在交割真实收敛，回撤更真实。
+
+| 品种 | 逐合约 年化 | *报告* | 夏普 | 最大回撤 | 胜率 |
+| ---- | ----------: | -----: | ---: | -------: | ---: |
+| IH+50ETF   | 3.1% | *3.8%* | 0.38 | −3.5% | 58% |
+| IF+300ETF  | 1.5% | *5.8%* | −0.26 | −1.4% | 60% |
+| IC+500ETF  | 6.6% | *4.7%* | 1.32 | −2.2% | 58% |
+| IM+1000ETF | 8.1% | *1.9%* | 1.37 | −3.0% | 57% |
+| **多品种复合** | **3.9%** | *6.6%* | **0.98** | **−1.1%** | 55% |
+
+**关键结论**：严格逐合约记账（复合 3.9%）比连续主力锁定 carry 近似（5.3%）**更保守**
+——近似口径略偏乐观。融券受限情景下逐合约的**胜率达 58–91%**，重现报告"胜率接近 100%"
+特征。两种口径的复合净值对照见 `figures/fig4_accounting_compare.png`。
+
 ### 融券受限情景（A 股现实，默认）
 
 四品种多为微负至打平，仅高股息 IH 勉强为正——印证华泰柏瑞"融券约束制约反向套利"：
@@ -111,8 +128,10 @@ src/
   basis_model.py               # 持有成本定价 / 分红调整年化基差 / 无套利区间
   signal.py                    # conv / galaxy / orient 三种因果信号
   etf_select.py                # 动态 ETF 择优 (流动性/跟踪误差)
+  contract_backtest.py         # 逐合约持有至交割 (严格记账, 无换月跳价)
   metrics.py                   # 年化/夏普/回撤/胜率/持仓周期
-track0_empirical/run_backtest.py
+track0_empirical/run_backtest.py   # 连续主力 + 锁定carry (近似, 含动态ETF)
+track0_empirical/run_contract.py   # 逐合约持有至交割 (严格)
 results/                       # basis_summary_*.csv
 figures/                       # 净值 / 基差图
 report/                        # report.tex + report.pdf (XeLaTeX 中文报告)

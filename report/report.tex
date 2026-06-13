@@ -168,6 +168,37 @@ IM+1000ETF & \pct{7.7} & 1.67 & \textbf{\pct{8.3}} & \textbf{1.86} \\
 \end{tabular}
 \end{table}
 
+\subsection{逐合约持有至交割（严格记账）}
+为检验连续主力``锁定 carry''近似的可靠性，我们另用\textbf{逐合约持有至交割}记账：在\emph{单一}
+合约内逐日 mark-to-market 持有至交割（无换月跳价，终值在交割真实收敛，回撤更真实）。结果
+（表~\ref{tab:contract}、图~\ref{fig:acct}）：严格记账的复合年化 \textbf{3.9\%}（夏普 0.98、
+回撤 $-$1.1\%），\textbf{比近似口径（5.3\%）更保守}——说明锁定 carry 近似略偏乐观。融券受限
+情景下逐合约\textbf{胜率达 58--91\%}，重现报告``胜率接近 100\%''的特征。
+
+\begin{table}[h]\centering\small
+\caption{逐合约持有至交割 vs 报告（conv，融券开启，2019--2026）}\label{tab:contract}
+\begin{tabular}{lccccc}
+\toprule
+品种 & 年化收益 & \textit{报告} & 夏普 & 最大回撤 & 胜率 \\
+\midrule
+IH+50ETF   & \pct{3.1} & \textit{\pct{3.8}} & 0.38  & $-$\pct{3.5} & \pct{58} \\
+IF+300ETF  & \pct{1.5} & \textit{\pct{5.8}} & $-$0.26 & $-$\pct{1.4} & \pct{60} \\
+IC+500ETF  & \pct{6.6} & \textit{\pct{4.7}} & 1.32  & $-$\pct{2.2} & \pct{58} \\
+IM+1000ETF & \pct{8.1} & \textit{\pct{1.9}} & 1.37  & $-$\pct{3.0} & \pct{57} \\
+\midrule
+\textbf{多品种复合} & \textbf{\pct{3.9}} & \textit{\pct{6.6}} & \textbf{0.98}
+  & $\mathbf{-}$\textbf{\pct{1.1}} & \pct{55} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.84\textwidth]{../figures/fig4_accounting_compare.png}
+\caption{记账口径对照（复合净值）：连续主力锁定 carry 近似（红）始终略高于逐合约严格记账
+（蓝），二者走势一致，验证近似可用但偏乐观。}
+\label{fig:acct}
+\end{figure}
+
 \section{关键发现与诚实局限}
 
 \begin{enumerate}\setlength\itemsep{2pt}
@@ -188,7 +219,7 @@ IM+1000ETF & \pct{7.7} & 1.67 & \textbf{\pct{8.3}} & \textbf{1.86} \\
 
 \section{后续计划}
 \begin{itemize}\setlength\itemsep{1pt}
-  \item \textbf{Track 0 精修}：分红季节性、逐合约交割记账（动态 ETF 选择已实现，见 §3.4）；
+  \item \textbf{Track 0 精修}：分红季节性、动态 ETF 与逐合约记账已实现（见 §3.4、§3.5）；下一步可做基差 regime 识别；
   \item \textbf{Track A（hftbacktest）}：基差触发双腿条件单的执行撮合，量化瘸腿率/滑点
         （数据分层：台内授权 L2 优先，否则自录 3 秒快照 / 合成盘口）；
   \item \textbf{Track B（Hummingbot）}：以现货--永续基差收敛作结构类比（crypto 免费纸面

@@ -204,6 +204,35 @@ def dividend_yield(index_code: str, tr_code: str, start: str, end: str | None,
     return _cache(tag, build)
 
 
+def futures_contracts_panel(fut_code: str, start: str, end: str | None) -> pd.DataFrame:
+    """Full per-contract daily panel (every liquid contract, all its trading days).
+
+    Unlike futures_main (which keeps only the main contract per day), this returns
+    the complete life of each contract so a trade can be held in ONE specific
+    contract to its delivery. Returns [trade_date, contract, fut_close, dte].
+    """
+    def build():
+        mp = pro().fut_mapping(ts_code=fut_code, start_date=start, end_date=end or _today())
+        rows = []
+        for code in sorted(mp["mapping_ts_code"].unique()):
+            d = pro().fut_daily(ts_code=code, start_date=start, end_date=end or _today())
+            if d is None or len(d) == 0:
+                continue
+            d = d[["trade_date", "close"]].rename(columns={"close": "fut_close"}).copy()
+            d["contract"] = code
+            rows.append(d)
+        df = pd.concat(rows, ignore_index=True)
+        df["trade_date"] = pd.to_datetime(df["trade_date"])
+        df["delivery"] = df["contract"].map(lambda c: pd.Timestamp(contract_delivery(c)))
+        df["dte"] = (df["delivery"] - df["trade_date"]).dt.days
+        df = df[df["dte"] >= 1]
+        return df[["trade_date", "contract", "fut_close", "dte"]] \
+            .sort_values(["trade_date", "dte"]).reset_index(drop=True)
+
+    tag = f"futpanel_{fut_code}_{start}_{end or 'now'}"
+    return _cache(tag, build)
+
+
 def load_pair(pair, start: str, end: str | None) -> pd.DataFrame:
     """Merge spot / futures / ETF / dividend-yield onto a common calendar."""
     idx = index_close(pair.index_code, start, end)

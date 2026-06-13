@@ -49,6 +49,12 @@ ETF_REBALANCE_DAYS = 21    # monthly rebalance, avoids daily churn
 ETF_TE_WINDOW = 60         # tracking-error lookback (trading days)
 ETF_LIQ_WINDOW = 20        # liquidity (amount) lookback
 
+# Per-contract hold-to-delivery accounting (逐合约持有至交割).
+# Enter ~a month out (front contract with dte>=floor) where the basis is still
+# meaningful, then hold to near delivery — mirrors 报告 ~40 天持仓。
+CONTRACT_ENTRY_MIN_DTE = 25  # open in the near contract ~25-45 days from delivery
+CONTRACT_ROLL_BUFFER = 3     # close the trade when within N days of delivery
+
 # Default backtest window (overridable by CLI). End None -> latest available.
 BACKTEST_START = "20190101"
 BACKTEST_END: str | None = None
