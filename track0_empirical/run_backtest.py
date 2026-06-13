@@ -61,8 +61,10 @@ def _attach_spot_leg(df: pd.DataFrame, pair, start: str, end: str | None,
         out["etf_chosen"] = sel["chosen"].reindex(out.index)
         out.attrs["n_switches"] = int((sel["chosen"] != sel["chosen"].shift()).sum())
     else:
-        out["track_excess"] = (out["etf_adj_close"].pct_change()
-                               - out["spot"].pct_change()).fillna(0.0)
+        out["track_excess"] = (
+            out["etf_adj_close"].pct_change(fill_method=None)
+            - out["spot"].pct_change(fill_method=None)
+        ).fillna(0.0)
         out["etf_chosen"] = pair.etf_code
         out.attrs["n_switches"] = 0
     return out
