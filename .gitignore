@@ -18,7 +18,7 @@ data/*.csv
 .idea/
 .vscode/
 
-# LaTeX build artifacts
+# LaTeX build artifacts (keep report.tex + report.pdf)
 report/*.aux
 report/*.log
 report/*.out
@@ -26,3 +26,4 @@ report/*.toc
 report/*.fls
 report/*.fdb_latexmk
 report/*.synctex.gz
+report/*.xdv
