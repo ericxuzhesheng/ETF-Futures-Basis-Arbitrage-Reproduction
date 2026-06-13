@@ -77,8 +77,11 @@ def _simulate(df: pd.DataFrame, pos: pd.Series) -> pd.Series:
     Idle capital earns rf (银河: 闲置保证金年化2%). ETF leg also picks up the
     small 折溢价/分红 excess. Costs charged on each position change.
     """
-    # Dividend-adjusted annualised basis rate (dte floored to tame the last week).
-    rate = df["basis"] / df["spot"] * 365.0 / df["dte"].clip(lower=7) + df["div_yield"]
+    # RAW annualised basis rate for the locked carry (dte floored for the last
+    # week). Dividends are NOT added here — they are realised seasonally through
+    # the ETF total-return leg (track term below), so the dividend-adjusted rate
+    # is used only for the *entry signal*, not double-counted in the P&L.
+    rate = df["basis"] / df["spot"] * 365.0 / df["dte"].clip(lower=7)
 
     # Trade-level LOCKED carry: 期现套利 pins the terminal value at delivery, so a
     # trade entered at rate r0 earns ~r0 annualised over its holding regardless of
