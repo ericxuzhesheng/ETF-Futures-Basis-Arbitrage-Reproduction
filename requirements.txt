@@ -1,0 +1,10 @@
+# Track 0 — empirical basis backtest (tushare)
+numpy>=1.26
+pandas>=2.0
+pyarrow>=14.0          # parquet cache for data/
+tushare>=1.4
+matplotlib>=3.8        # figures (make_figures.py, planned)
+
+# Track A — hftbacktest execution (planned, see plan):
+#   hftbacktest>=2.4
+# Track B — Hummingbot is a separate Docker runtime, not pip-installed.
