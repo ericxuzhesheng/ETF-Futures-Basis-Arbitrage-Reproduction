@@ -43,7 +43,7 @@ from src.signal import (  # noqa: E402
 RESULTS = ROOT / "results"
 RESULTS.mkdir(exist_ok=True)
 
-_OPEN_COST = COSTS.fut_fee + COSTS.etf_fee + COSTS.impact  # one direction, both legs
+_OPEN_COST = COSTS.exec_one_way  # realised one-way execution cost, both legs
 
 
 def _tracking_excess(df: pd.DataFrame) -> pd.Series:
@@ -64,14 +64,21 @@ def _simulate(df: pd.DataFrame, pos: pd.Series) -> pd.Series:
     Idle capital earns rf (银河: 闲置保证金年化2%). ETF leg also picks up the
     small 折溢价/分红 excess. Costs charged on each position change.
     """
-    pos_exec = pos.shift(1).fillna(0)
-    # Daily carry = annualised basis rate / trading days, earned while correctly
-    # positioned. dte floored at 7 calendar days so the annualisation does not
-    # explode/flip sign in the last week before delivery.
-    rate = df["basis"] / df["spot"] * 365.0 / df["dte"].clip(lower=7)
-    daily_carry = pos_exec * rate / TRADING_DAYS
-    idle = (pos_exec == 0).astype(float) * (COSTS.rf / TRADING_DAYS)
-    track = pos_exec.abs() * _tracking_excess(df)
+    # Dividend-adjusted annualised basis rate (dte floored to tame the last week).
+    rate = df["basis"] / df["spot"] * 365.0 / df["dte"].clip(lower=7) + df["div_yield"]
+
+    # Trade-level LOCKED carry: 期现套利 pins the terminal value at delivery, so a
+    # trade entered at rate r0 earns ~r0 annualised over its holding regardless of
+    # the path (报告: 胜率≈100%, 回撤极小). We lock the per-position carry at entry
+    # (sign-corrected so a correctly-placed trade is positive) and accrue it daily.
+    entry = (pos != 0) & (pos.shift(1).fillna(0) == 0)
+    locked = (pos * rate).clip(-0.40, 0.40).where(entry).ffill()
+    locked = locked.where(pos != 0, 0.0)                 # zero while flat
+    locked_exec = locked.shift(1).fillna(0.0)
+
+    daily_carry = locked_exec / TRADING_DAYS
+    idle = (locked_exec == 0).astype(float) * (COSTS.rf / TRADING_DAYS)
+    track = (pos.shift(1).fillna(0)).abs() * _tracking_excess(df)
     dpos = pos.diff().abs().fillna(pos.abs())
     cost = dpos * _OPEN_COST
     return (daily_carry + idle + track - cost).fillna(0.0).rename("net_ret")

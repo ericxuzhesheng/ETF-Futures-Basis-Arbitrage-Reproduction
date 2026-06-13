@@ -148,14 +148,49 @@ def futures_main(fut_code: str, start: str, end: str | None) -> pd.DataFrame:
     return _cache(tag, build)
 
 
+def dividend_yield(index_code: str, tr_code: str, start: str, end: str | None,
+                   window: int) -> pd.DataFrame:
+    """Trailing annualised dividend yield from the price vs total-return index gap.
+
+    The 全收益 index reinvests dividends, the price index does not; the rolling
+    sum of (TR return - price return) over `window` trading days is the trailing
+    annual dividend yield. Used to dividend-adjust the futures basis.
+    Returns [trade_date, div_yield].
+    """
+    def build():
+        px = index_close(index_code, start, end).rename(columns={"spot": "px"})
+        tr = pro().index_daily(ts_code=tr_code, start_date=start,
+                               end_date=end or _today())[["trade_date", "close"]]
+        tr["trade_date"] = pd.to_datetime(tr["trade_date"])
+        tr = tr.rename(columns={"close": "tr"}).sort_values("trade_date")
+        m = px.merge(tr, on="trade_date", how="inner").sort_values("trade_date")
+        daily_div = m["tr"].pct_change() - m["px"].pct_change()
+        m["div_yield"] = daily_div.rolling(window, min_periods=window // 4) \
+                                  .sum().clip(lower=0.0)
+        m["div_yield"] = m["div_yield"].bfill()
+        return m[["trade_date", "div_yield"]]
+
+    tag = f"divyield_{index_code}_{start}_{end or 'now'}"
+    return _cache(tag, build)
+
+
 def load_pair(pair, start: str, end: str | None) -> pd.DataFrame:
-    """Merge spot / futures / ETF onto a common trading calendar for one pair."""
+    """Merge spot / futures / ETF / dividend-yield onto a common calendar."""
     idx = index_close(pair.index_code, start, end)
     fut = futures_main(pair.fut_code, start, end)
     etf = etf_close(pair.etf_code, start, end)
+    div = dividend_yield(pair.index_code, pair.tr_code, start, end,
+                         _div_window())
     df = idx.merge(fut, on="trade_date", how="inner") \
-            .merge(etf, on="trade_date", how="inner")
+            .merge(etf, on="trade_date", how="inner") \
+            .merge(div, on="trade_date", how="left")
+    df["div_yield"] = df["div_yield"].ffill().bfill().fillna(0.0)
     return df.sort_values("trade_date").reset_index(drop=True)
+
+
+def _div_window() -> int:
+    from config import DIV_YIELD_WINDOW
+    return DIV_YIELD_WINDOW
 
 
 def _today() -> str:

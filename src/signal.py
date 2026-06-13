@@ -48,6 +48,9 @@ def convergence_position(df: pd.DataFrame, p: SignalParams) -> pd.Series:
                 state = 1
             elif r <= -p.conv_enter_rate and p.allow_short_etf:
                 state = -1
+        # Hold the entire 升水/贴水 regime: exit only when the (dividend-adjusted)
+        # basis crosses through zero against the position. Low turnover (~报告 40d)
+        # so the captured carry covers round-trip cost.
         elif state == 1 and r <= p.conv_exit_rate:
             state = 0
         elif state == -1 and r >= -p.conv_exit_rate:
