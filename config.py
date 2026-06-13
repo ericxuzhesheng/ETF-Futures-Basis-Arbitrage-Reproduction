@@ -19,22 +19,35 @@ class Pair:
     fut_code: str      # continuous main-contract handle for fut_mapping, e.g. "IF.CFX"
     index_code: str    # underlying index (futures settles to this), e.g. "000300.SH"
     tr_code: str       # total-return (全收益) index, gap vs price = dividends
-    etf_code: str      # spot ETF leg, e.g. "510300.SH"
+    etf_candidates: tuple[str, ...]  # ETF legs; [0] = primary (fixed mode)
     multiplier: int    # contract multiplier (point value, CNY/index-point)
     start_date: str    # earliest sensible backtest start (contract listing aware)
 
+    @property
+    def etf_code(self) -> str:
+        return self.etf_candidates[0]
 
-# The four CFFEX index-futures families and their canonical broad-based ETF legs.
+
+# The four CFFEX index-futures families and their candidate broad-based ETF legs.
 PAIRS: tuple[Pair, ...] = (
-    Pair("IH+50ETF",   "IH.CFX", "000016.SH", "H00016.CSI", "510050.SH", 300, "20190101"),
-    Pair("IF+300ETF",  "IF.CFX", "000300.SH", "H00300.CSI", "510300.SH", 300, "20190101"),
-    Pair("IC+500ETF",  "IC.CFX", "000905.SH", "H00905.CSI", "510500.SH", 200, "20190101"),
-    Pair("IM+1000ETF", "IM.CFX", "000852.SH", "H00852.CSI", "512100.SH", 200, "20220722"),  # IM listed 2022-07-22
+    Pair("IH+50ETF",   "IH.CFX", "000016.SH", "H00016.CSI",
+         ("510050.SH",), 300, "20190101"),
+    Pair("IF+300ETF",  "IF.CFX", "000300.SH", "H00300.CSI",
+         ("510300.SH", "510330.SH", "510310.SH", "159919.SZ"), 300, "20190101"),
+    Pair("IC+500ETF",  "IC.CFX", "000905.SH", "H00905.CSI",
+         ("510500.SH", "512500.SH", "159922.SZ"), 200, "20190101"),
+    Pair("IM+1000ETF", "IM.CFX", "000852.SH", "H00852.CSI",
+         ("512100.SH", "159845.SZ", "560010.SH"), 200, "20220722"),  # IM listed 2022-07-22
 )
 
 # Rolling lookback (trading days) for the trailing dividend-yield estimate used
 # to dividend-adjust the basis (分红基差调整).
 DIV_YIELD_WINDOW = 244
+
+# Dynamic ETF selection (东证: 按流动性/跟踪误差/折溢价择优现货端).
+ETF_REBALANCE_DAYS = 21    # monthly rebalance, avoids daily churn
+ETF_TE_WINDOW = 60         # tracking-error lookback (trading days)
+ETF_LIQ_WINDOW = 20        # liquidity (amount) lookback
 
 # Default backtest window (overridable by CLI). End None -> latest available.
 BACKTEST_START = "20190101"

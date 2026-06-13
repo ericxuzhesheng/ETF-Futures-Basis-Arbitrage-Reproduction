@@ -46,12 +46,25 @@ RESULTS.mkdir(exist_ok=True)
 _OPEN_COST = COSTS.exec_one_way  # realised one-way execution cost, both legs
 
 
-def _tracking_excess(df: pd.DataFrame) -> pd.Series:
-    """ETF total return minus its index return = 折溢价/分红 excess captured by
-    holding the ETF leg (small, but the report's '固定ETF叠加折溢价' alpha)."""
-    r_etf = df["etf_adj_close"].pct_change()
-    r_idx = df["spot"].pct_change()
-    return (r_etf - r_idx).fillna(0.0)
+def _attach_spot_leg(df: pd.DataFrame, pair, start: str, end: str | None,
+                     dynamic: bool) -> pd.DataFrame:
+    """Attach track_excess (ETF total return - index) for the spot leg, either
+    from the fixed primary ETF or a dynamically selected one (东证 择优现货)."""
+    out = df.copy()
+    if dynamic and len(pair.etf_candidates) > 1:
+        from src import etf_select
+        idx = out.reset_index()[["trade_date", "spot"]]
+        sel = etf_select.select(pair.etf_candidates, idx, start, end) \
+            .set_index("trade_date")
+        out["track_excess"] = sel["track_excess"].reindex(out.index).fillna(0.0)
+        out["etf_chosen"] = sel["chosen"].reindex(out.index)
+        out.attrs["n_switches"] = int((sel["chosen"] != sel["chosen"].shift()).sum())
+    else:
+        out["track_excess"] = (out["etf_adj_close"].pct_change()
+                               - out["spot"].pct_change()).fillna(0.0)
+        out["etf_chosen"] = pair.etf_code
+        out.attrs["n_switches"] = 0
+    return out
 
 
 def _simulate(df: pd.DataFrame, pos: pd.Series) -> pd.Series:
@@ -78,18 +91,19 @@ def _simulate(df: pd.DataFrame, pos: pd.Series) -> pd.Series:
 
     daily_carry = locked_exec / TRADING_DAYS
     idle = (locked_exec == 0).astype(float) * (COSTS.rf / TRADING_DAYS)
-    track = (pos.shift(1).fillna(0)).abs() * _tracking_excess(df)
+    track = (pos.shift(1).fillna(0)).abs() * df["track_excess"]
     dpos = pos.diff().abs().fillna(pos.abs())
     cost = dpos * _OPEN_COST
     return (daily_carry + idle + track - cost).fillna(0.0).rename("net_ret")
 
 
-def run_pair(pair, start: str, end: str | None, signals) -> dict:
+def run_pair(pair, start: str, end: str | None, signals, dynamic: bool = False) -> dict:
     pstart = max(start, pair.start_date)
     raw = dt.load_pair(pair, pstart, end)
     df = basis_model.with_basis_columns(raw, rf=COSTS.rf).set_index("trade_date")
+    df = _attach_spot_leg(df, pair, pstart, end, dynamic)
 
-    results = {"pair": pair.name, "rows": len(df),
+    results = {"pair": pair.name, "rows": len(df), "n_switches": df.attrs.get("n_switches", 0),
                "span": f"{df.index[0].date()}..{df.index[-1].date()}"}
     nets = {}
     for label, gen in (("conv", convergence_position),
@@ -125,17 +139,20 @@ def main() -> None:
     ap.add_argument("--end", default=BACKTEST_END)
     ap.add_argument("--allow-short", action="store_true",
                     help="允许做空ETF(反向套利). 复现报告需开启; 默认关闭=A股融券受限现实")
+    ap.add_argument("--dynamic", action="store_true",
+                    help="动态ETF选择(东证: 按流动性/跟踪误差择优); 默认固定主ETF")
     args = ap.parse_args()
 
     signals = dataclasses.replace(SIGNALS, allow_short_etf=args.allow_short)
     mode = "融券开启 (复现报告/有融券资源机构)" if args.allow_short \
         else "融券受限 (A股现实, 仅正向套利)"
-    per_pair = [run_pair(p, args.start, args.end, signals) for p in PAIRS]
+    etf_mode = "动态ETF择优" if args.dynamic else "固定主ETF"
+    per_pair = [run_pair(p, args.start, args.end, signals, args.dynamic) for p in PAIRS]
 
     # ---- console table -----------------------------------------------------
     print("\n" + "=" * 92)
     print("Track 0 — ETF / 股指期货 期现基差套利复现  (net of costs)")
-    print(f"模式: {mode}   区间: {args.start}..{args.end or 'now'}")
+    print(f"模式: {mode} | 现货端: {etf_mode}   区间: {args.start}..{args.end or 'now'}")
     print("=" * 92)
     hdr = f"{'pair':12s} {'strat':8s} {'ann_ret':>9s} {'sharpe':>7s} {'max_dd':>8s} {'win':>7s} {'trades':>7s} {'hold':>6s}  vs报告"
     print(hdr)
@@ -173,10 +190,41 @@ def main() -> None:
                      "report_ann_return": rep["ann_return"]})
 
     out = pd.DataFrame(rows_out)
-    suffix = "short" if args.allow_short else "noshort"
+    suffix = ("short" if args.allow_short else "noshort") + ("_dyn" if args.dynamic else "")
     csv_path = RESULTS / f"basis_summary_{suffix}.csv"
     out.to_csv(csv_path, index=False, encoding="utf-8-sig")
     print(f"[saved] {csv_path}")
+
+    compare_fixed_dynamic(args.start, args.end, signals)
+
+
+def compare_fixed_dynamic(start, end, signals) -> None:
+    """Side-by-side conv: fixed primary ETF vs dynamically selected spot leg."""
+    print("\n" + "=" * 92)
+    print("动态 ETF 择优 对照 (conv 基差收敛策略)")
+    print("=" * 92)
+    print(f"{'pair':12s} | {'固定ETF':>22s} | {'动态ETF':>22s} | {'切换':>4s}")
+    print(f"{'':12s} | {'年化   夏普   波动':>22s} | {'年化   夏普   波动':>22s} |")
+    print("-" * 92)
+    fixed_nets, dyn_nets = [], []
+    for p in PAIRS:
+        rf = run_pair(p, start, end, signals, dynamic=False)
+        rd = run_pair(p, start, end, signals, dynamic=True)
+        mf, md = rf["conv"], rd["conv"]
+        fixed_nets.append(rf["_nets"]["conv"]); dyn_nets.append(rd["_nets"]["conv"])
+        print(f"{p.name:12s} | {_fmt_pct(mf['ann_return'])} {mf['sharpe']:5.2f} "
+              f"{_fmt_pct(mf['ann_vol'])} | {_fmt_pct(md['ann_return'])} {md['sharpe']:5.2f} "
+              f"{_fmt_pct(md['ann_vol'])} | {rd['n_switches']:4d}")
+    cf = metrics.summarize(pd.concat(fixed_nets, axis=1).fillna(0).mean(axis=1),
+                           pd.Series(1, index=fixed_nets[0].index))
+    cd = metrics.summarize(pd.concat(dyn_nets, axis=1).fillna(0).mean(axis=1),
+                           pd.Series(1, index=dyn_nets[0].index))
+    print("-" * 92)
+    print(f"{'COMPOSITE':12s} | {_fmt_pct(cf['ann_return'])} {cf['sharpe']:5.2f} "
+          f"{_fmt_pct(cf['ann_vol'])} | {_fmt_pct(cd['ann_return'])} {cd['sharpe']:5.2f} "
+          f"{_fmt_pct(cd['ann_vol'])} |")
+    print("=" * 92)
+    print("东证: 动态择优现货端使基差收敛更稳定(波动↓/夏普↑); IH仅510050无可切换。\n")
 
 
 if __name__ == "__main__":

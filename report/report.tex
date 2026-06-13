@@ -141,6 +141,30 @@ IM+1000ETF & \pct{6.8} & \textit{\pct{1.9}} & 1.41 & $-$\pct{4.1} & \pct{64} \\
 \label{fig:basis}
 \end{figure}
 
+\subsection{动态 ETF 选择（东证精修）}
+对每个指数的多只候选 ETF，每月按 $z(\text{流动性}) - z(\text{跟踪误差})$ 择优现货端
+（候选池见仓库 \texttt{config.py}）。结果（表~\ref{tab:dyn}）：动态择优在候选 ETF
+\textbf{分散度最大的 IM（小盘）}上提升最明显（年化 6.8\%$\to$7.5\%，夏普 1.41$\to$1.60），
+IF（同质）近中性，IH（仅 510050）无变化——与东证``动态选择 ETF 表现更稳定''一致。
+
+\begin{table}[h]\centering\small
+\caption{固定 ETF vs 动态择优（conv，融券开启，2019--2026）}\label{tab:dyn}
+\begin{tabular}{lcccc}
+\toprule
+ & \multicolumn{2}{c}{固定 ETF} & \multicolumn{2}{c}{动态择优} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+品种 & 年化 & 夏普 & 年化 & 夏普 \\
+\midrule
+IH+50ETF   & \pct{5.2} & 1.43 & \pct{5.2} & 1.43 \\
+IF+300ETF  & \pct{4.7} & 1.07 & \pct{4.7} & 1.05 \\
+IC+500ETF  & \pct{7.0} & 1.65 & \pct{7.1} & 1.66 \\
+IM+1000ETF & \pct{6.8} & 1.41 & \textbf{\pct{7.5}} & \textbf{1.60} \\
+\midrule
+\textbf{复合} & \pct{5.1} & 2.62 & \textbf{\pct{5.2}} & \textbf{2.68} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \section{关键发现与诚实局限}
 
 \begin{enumerate}\setlength\itemsep{2pt}
@@ -161,7 +185,7 @@ IM+1000ETF & \pct{6.8} & \textit{\pct{1.9}} & 1.41 & $-$\pct{4.1} & \pct{64} \\
 
 \section{后续计划}
 \begin{itemize}\setlength\itemsep{1pt}
-  \item \textbf{Track 0 精修}：动态 ETF 选择、分红季节性、逐合约交割记账；
+  \item \textbf{Track 0 精修}：分红季节性、逐合约交割记账（动态 ETF 选择已实现，见 §3.4）；
   \item \textbf{Track A（hftbacktest）}：基差触发双腿条件单的执行撮合，量化瘸腿率/滑点
         （数据分层：台内授权 L2 优先，否则自录 3 秒快照 / 合成盘口）；
   \item \textbf{Track B（Hummingbot）}：以现货--永续基差收敛作结构类比（crypto 免费纸面

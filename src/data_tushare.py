@@ -113,6 +113,36 @@ def etf_close(etf_code: str, start: str, end: str | None) -> pd.DataFrame:
     return _cache(tag, build)
 
 
+def etf_panel(etf_code: str, start: str, end: str | None) -> pd.DataFrame:
+    """One ETF's daily price/amount/NAV for dynamic selection.
+
+    Returns [trade_date, adj_close, amount, premium] where premium = close/nav-1
+    (二级价格相对单位净值的折溢价).
+    """
+    def build():
+        px = pro().fund_daily(ts_code=etf_code, start_date=start,
+                              end_date=end or _today())[["trade_date", "close", "amount"]]
+        adj = pro().fund_adj(ts_code=etf_code, start_date=start,
+                             end_date=end or _today())[["trade_date", "adj_factor"]]
+        nav = pro().fund_nav(ts_code=etf_code, start_date=start,
+                             end_date=end or _today())[["nav_date", "unit_nav"]] \
+            .rename(columns={"nav_date": "trade_date"}) \
+            .drop_duplicates("trade_date", keep="last")
+        px = px.drop_duplicates("trade_date", keep="last")
+        adj = adj.drop_duplicates("trade_date", keep="last")
+        df = px.merge(adj, on="trade_date", how="left").merge(nav, on="trade_date", how="left")
+        df["adj_factor"] = df["adj_factor"].ffill().bfill()
+        df["unit_nav"] = df["unit_nav"].ffill().bfill()
+        df["trade_date"] = pd.to_datetime(df["trade_date"])
+        df = df.sort_values("trade_date").reset_index(drop=True)
+        df["adj_close"] = df["close"] * df["adj_factor"]
+        df["premium"] = df["close"] / df["unit_nav"] - 1.0
+        return df[["trade_date", "adj_close", "amount", "premium"]]
+
+    tag = f"etfpanel_{etf_code}_{start}_{end or 'now'}"
+    return _cache(tag, build)
+
+
 def futures_main(fut_code: str, start: str, end: str | None) -> pd.DataFrame:
     """Continuous main contract via fut_mapping + per-contract fut_daily.
 
