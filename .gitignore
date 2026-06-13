@@ -13,6 +13,9 @@ venv/
 data/*.parquet
 data/*.csv
 
+# Re-generable Track A child-order fills can become large with L2 data.
+results/trackA_execution_fills_*.csv
+
 # OS / editor
 .DS_Store
 .idea/

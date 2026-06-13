@@ -111,6 +111,47 @@ class SignalParams:
 
 SIGNALS = SignalParams()
 
+
+@dataclass(frozen=True)
+class RegimeParams:
+    """Basis-regime classifier parameters.
+
+    Regime labels:
+      +1  premium / contango: futures rich versus ETF/index spot
+      -1  discount / backwardation: futures cheap versus ETF/index spot
+       0  neutral: inside the no-trade band or not yet confirmed
+    """
+
+    enter_rate: float = 0.01      # annualised dividend-adjusted basis needed to confirm a side
+    exit_rate: float = 0.002      # hysteresis band; do not flip until basis crosses back inside
+    min_confirm_days: int = 3     # suppress one-day basis spikes around rolls/dividend dates
+    use_dividend_adjusted: bool = True
+
+
+REGIME = RegimeParams()
+
+
+@dataclass(frozen=True)
+class ExecutionParams:
+    """Track A execution-simulation parameters.
+
+    These are deliberately conservative defaults for a daily-data proxy of an
+    hftbacktest queue/fill model. Real L2 snapshots can replace the synthetic
+    book adapter without changing the runner output schema.
+    """
+
+    child_slices: int = 8
+    tick_size: float = 0.2
+    spread_ticks: int = 2
+    passive_depth_bps: float = 3.0
+    active_cross_bps: float = 1.5
+    queue_decay: float = 0.35
+    max_passive_wait_slices: int = 4
+    target_notional: float = 10_000_000.0
+
+
+EXECUTION = ExecutionParams()
+
 # Published benchmark numbers for side-by-side validation in the report.
 # 东证期货 (基差收敛, 动态ETF, 2018+):  年化收益 / 平均最大回撤 / 持仓周期≈40天
 REPORT_CONVERGENCE = {
