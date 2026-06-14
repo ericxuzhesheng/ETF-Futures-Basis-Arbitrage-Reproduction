@@ -37,6 +37,26 @@
 \texttt{ETF-Futures-Basis-Arbitrage-Reproduction}。
 \end{abstract}
 
+\begin{table}[h]\centering\small
+\caption{三轨道结果一览（费后；头条口径，细节见正文）}\label{tab:overview}
+\begin{tabular}{>{\raggedright\arraybackslash}p{1.7cm}
+                >{\raggedright\arraybackslash}p{4.4cm}
+                >{\raggedright\arraybackslash}p{2.5cm}
+                >{\raggedright\arraybackslash}p{4.6cm}}
+\toprule
+轨道 & 内容 & 数据 & 头条结果 \\
+\midrule
+Track 0 & 四品种期现基差套利（三信号 + regime） & tushare 真实 A 股 & 复合 \pct{5.6} / 夏普 1.94 / 回撤 $-$\pct{3.5}（$\approx$ 银河 \pct{6.6}）；逐合约严格记账 \pct{3.9} \\
+Track A & 执行撮合 proxy + 真实/自录 L2 摄入与录制 & 自录 depth-5 五档 & 滑点回灌后复合 \pct{4.6} / 夏普 1.39 \\
+Track B & 币安现货--永续基差（加密类比，carry $=$ 资金费） & 币安免费公共行情 & conv 复合 \pct{7.1} / 夏普 5.24 / 回撤 $-$\pct{4.0} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textbf{一句话结论}：期现套利赚的是``年化基差 $+$ 分红 $-$ 成本'',而\textbf{融券
+约束}决定 A 股能否真正执行——融券受限情景下四品种多为微负至打平，报告的正收益高度依赖
+融券资源。
+
 \section{研究背景与目标}
 
 \textbf{课题}：ETF 高频/日频套利。\textbf{复现对象}（互相印证的同一框架）：
