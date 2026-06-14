@@ -16,6 +16,12 @@ Run on PAPER first (binance_paper_trade + binance_perpetual_testnet). See the
 sibling README.md for the full run manual. Thresholds match config.SignalParams
 (conv_enter_rate=0.03, conv_exit_rate=-0.005) so live behaviour tracks the
 backtest.
+
+API COMPATIBILITY: this targets the Hummingbot script-strategy interface but has
+not been pinned to a specific release. Verify against your installed version —
+notably `connector.get_funding_info(pair).rate`, `PositionAction`, and the
+`buy/sell(..., position_action=...)` signature can differ across Hummingbot
+versions. Adjust if the client raises AttributeError / TypeError on start.
 """
 
 from decimal import Decimal

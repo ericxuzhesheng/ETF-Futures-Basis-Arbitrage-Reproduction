@@ -289,13 +289,45 @@ dividends    = realised seasonally via the ETF total-return leg (not double-coun
 The composite closely matches Galaxy's report (6.6% / Sharpe 1.78 / −3.4%). Dynamic ETF
 selection adds most where candidate ETFs diverge (IM: 7.8%→8.2%, Sharpe 1.74→1.85).
 
+## 📥 Track A — Real / self-recorded L2 ingestion
+
+The execution book is a pluggable `BookProvider`: the synthetic book is the default and
+fallback, while real / self-recorded **depth-5 L2 snapshots** drive the same queue/fill
+model. Snapshots land as `data/snapshots/<code>/<YYYYMMDD>.parquet` with the standard
+schema (`ts`, `bid_px/sz_1..5`, `ask_px/sz_1..5`). The runner reports a `snapshot_fill_rate`
+coverage so mixed real/synthetic runs stay auditable. `record_snapshots.py` records live
+books during the session — ETF legs get the full 5 levels via tushare today; index-futures
+5-level L2 needs a broker CTP feed.
+
+## 🪙 Track B — Binance spot–perp basis (crypto analog)
+
+The crypto equivalent of the cash-futures trade is **spot vs USDⓈ-M perpetual**: long spot /
+short perp harvests the **funding rate** (the perp's convergence mechanism), mirroring 多 ETF /
+空期货 carry. Data is all free, key-less Binance public REST (spot/perp klines + funding
+history); the same conv/galaxy/orient signals apply, and P&L is the realized
+`(r_spot − r_perp + funding)` per day (no locked-carry assumption).
+
+| Pair | conv ann. | Sharpe | MaxDD | Win |
+| ---- | --------: | -----: | ----: | --: |
+| BTC | 7.4% | 5.03 | −6.0% | 83% |
+| ETH | 8.9% | 5.19 | −6.4% | 82% |
+| BNB | 5.0% | 2.84 | −2.0% | 67% |
+| **Composite** | **7.1%** | **5.24** | **−4.0%** | 75% |
+
+Funding-carry's low-vol / high-Sharpe (≈5) matches A-share forward arbitrage; two-sided
+(shorting spot on negative funding) lifts the composite to 8.3% / Sharpe 5.77. A Hummingbot
+paper-trading deployment artifact is under `trackB_deploy/hummingbot/`.
+
 ## ⚙️ Quick Start
 
 ```bash
 pip install -r requirements.txt
 cp .env.example .env          # add your own TUSHARE_TOKEN (.env is gitignored)
-python track0_empirical/run_backtest.py --start 20190101 --allow-short --dynamic
-python trackA_execution/run_hftbacktest_proxy.py --start 20190101 --allow-short
+python track0_empirical/run_backtest.py --start 20190101 --allow-short --dynamic   # Track 0
+python trackA_execution/run_hftbacktest_proxy.py --start 20190101 --allow-short     # Track A synthetic
+python trackA_execution/run_hftbacktest_proxy.py --start 20190101 --allow-short --use-snapshots  # Track A real L2
+python trackA_execution/record_snapshots.py --etf 510300.SH --once                 # record live L2
+python trackB_deploy/run_basis_backtest.py --start 20210101                         # Track B (Binance)
 python -m unittest discover
 ```
 
