@@ -4,6 +4,7 @@
   fig2_pair_equity.png        — 四品种 conv 净值曲线
   fig3_basis_divadj.png       — IF 年化基差: 原始 vs 分红调整
   fig5_execution_adjusted.png — Track 0 理论净值 vs Track A 执行后净值
+  fig6_trackB_equity.png      — Track B 币安现货-永续 复合净值 (仅正carry vs 双向)
 
 Run:  python make_figures.py
 """
@@ -122,7 +123,39 @@ def main() -> None:
         fig.tight_layout(); fig.savefig(FIG / "fig5_execution_adjusted.png", dpi=150)
         plt.close(fig)
 
+    _trackB_figure()
     print("[saved] fig1..fig5 (composite / pair / basis / accounting / execution-adjusted)")
+
+
+def _trackB_figure(start: str = "20210101") -> None:
+    """fig6 — Track B 币安现货-永续 复合净值 (仅正carry vs 双向). Binance-data; skip on failure."""
+    try:
+        from config import CRYPTO_PAIRS, SIGNALS as _SIG
+        from trackB_deploy.run_basis_backtest import run_pair as bn_run
+    except Exception as exc:  # pragma: no cover
+        print(f"[skip] fig6 Track B import failed: {exc}")
+        return
+    try:
+        sig_long = dataclasses.replace(_SIG, allow_short_etf=False)
+        sig_short = dataclasses.replace(_SIG, allow_short_etf=True)
+        long_c = pd.concat([bn_run(p, start, None, sig_long)["_nets"]["conv"]
+                            for p in CRYPTO_PAIRS], axis=1).fillna(0).mean(axis=1)
+        short_c = pd.concat([bn_run(p, start, None, sig_short)["_nets"]["conv"]
+                             for p in CRYPTO_PAIRS], axis=1).fillna(0).mean(axis=1)
+    except Exception as exc:  # pragma: no cover
+        print(f"[skip] fig6 Track B data unavailable: {exc}")
+        return
+    fig, ax = plt.subplots(figsize=(9, 4.5))
+    ax.plot(_eq(short_c).index, _eq(short_c).values, lw=1.8, color="#8E44AD",
+            label="双向 (含负资金费做空现货)")
+    ax.plot(_eq(long_c).index, _eq(long_c).values, lw=1.8, color="#F39C12",
+            label="仅正carry (多现货/空永续)")
+    ax.axhline(1.0, color="grey", lw=0.6, ls="--")
+    ax.set_title("Track B 币安现货-永续 基差套利 复合净值 (BTC/ETH/BNB, 2021–2026)")
+    ax.set_ylabel("净值"); ax.legend(); ax.grid(alpha=0.25)
+    fig.tight_layout(); fig.savefig(FIG / "fig6_trackB_equity.png", dpi=150)
+    plt.close(fig)
+    print("[saved] fig6_trackB_equity.png (Track B composite)")
 
 
 if __name__ == "__main__":

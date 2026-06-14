@@ -308,6 +308,13 @@ BNB & \pct{5.0} & 2.84 & $-$\pct{2.0} & \pct{67} \\
 \end{tabular}
 \end{table}
 
+\begin{figure}[h]\centering
+\includegraphics[width=0.84\textwidth]{../figures/fig6_trackB_equity.png}
+\caption{Track B 币安现货--永续 基差套利复合净值（BTC/ETH/BNB，2021--2026）：双向（紫）
+收至约 1.55、仅正 carry（橙）约 1.45，资金费 carry 低波动稳步上行，夏普 $\approx$ 5。}
+\label{fig:trackb}
+\end{figure}
+
 \noindent\textbf{Hummingbot 纸面部署制品。} 仓库 \texttt{trackB\_deploy/hummingbot/} 给出把
 上述 conv 信号搬到 Hummingbot 的脚本策略（资金费 carry 收敛）、配置（阈值同源于
 \texttt{config.py}）、\texttt{docker-compose} 与运行手册。Hummingbot 仅接 crypto 交易所，
