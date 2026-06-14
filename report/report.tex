@@ -30,7 +30,10 @@
 6.6\% / 1.78 / $-$3.4\% 高度吻合。报告同时给出\textbf{融券受限}（A 股现实）情景下的
 诚实结果：纯正向套利在长期贴水市场中空间很薄，印证融券约束对反向套利的制约。本工作是
 ``ETF 高频套利''课题的定量主体（Track 0），并已给出 hftbacktest-style 执行撮合 proxy
-（Track A）用于度量 child-order 滑点与 crossing。代码与数据管道见私有仓库
+（Track A，盘口已抽象为可插拔 \texttt{BookProvider}，支持真实/自录 depth-5 L2 快照摄入与
+交易时段录制），以及 Track B——以币安\textbf{现货--永续}基差作为期现套利的加密类比
+（永续 carry $=$ 资金费），在免费公共行情上复用同一信号跑出真实净值（conv 复合年化
+\pct{7.1}、夏普 5.24），并附 Hummingbot 纸面部署制品。代码与数据管道见私有仓库
 \texttt{ETF-Futures-Basis-Arbitrage-Reproduction}。
 \end{abstract}
 
@@ -272,6 +275,44 @@ IM+1000ETF & 109 &  872 & \pct{75} & 3.30 \\
 \label{fig:execadj}
 \end{figure}
 
+\noindent\textbf{真实 L2 摄入与录制。} 盘口已抽象为可插拔 \texttt{BookProvider}：合成盘口为
+默认与缺数降级，真实/自录 \textbf{depth-5 L2 快照}（标准列 \texttt{bid\_px/sz\_1..5}、
+\texttt{ask\_px/sz\_1..5}，落 \texttt{data/snapshots/<code>/<YYYYMMDD>.parquet}）经同一接口
+驱动撮合，并报告 \texttt{snapshot\_fill\_rate} 覆盖率以审计真实/合成混合回测。配套
+\texttt{record\_snapshots.py} 在交易时段轮询实时盘口落地：ETF 腿用 tushare 五档（现已可录，
+实测对 510300/510500 抓出真实五档并算出真实深度），股指期货完整五档待券商 CTP 行情接入。
+
+\subsection{Track B：币安现货--永续 基差套利（加密类比）}
+期现套利在加密市场的等价物是\textbf{现货 vs USD\textsuperscript{ⓈM} 永续}的 cash-and-carry：
+多现货 / 空永续，靠\textbf{资金费}（funding，永续的收敛机制，每 8h 结算）吃 carry，
+对应 A 股的多 ETF / 空期货收敛 carry。数据全部来自币安\textbf{免费公共行情}（现货/永续
+K 线 $+$ 资金费历史，免密钥），复用 Track 0 的 conv / galaxy / orient 三信号与 regime；
+P\&L 用真实 $(r_{\text{spot}}-r_{\text{perp}}+\text{funding})$ \textbf{逐日实现，无锁定
+carry 假设}（加密三腿数据完整，比 Track 0 的连续主力近似更硬）。结果见表~\ref{tab:trackb}：
+conv 复合年化 \pct{7.1}、夏普 5.24、回撤 $-$\pct{4.0}，资金费 carry 的低波动/高夏普
+（夏普 $\approx$ 5）与 A 股期现正向套利一致；放开双向（含负资金费做空现货）后复合年化升至
+\pct{8.3}、夏普 5.77。
+
+\begin{table}[h]\centering\small
+\caption{Track B 币安现货--永续 基差收敛（conv，2021--2026，费后）}\label{tab:trackb}
+\begin{tabular}{lcccc}
+\toprule
+品种 & 年化收益 & 夏普 & 最大回撤 & 胜率 \\
+\midrule
+BTC & \pct{7.4} & 5.03 & $-$\pct{6.0} & \pct{83} \\
+ETH & \pct{8.9} & 5.19 & $-$\pct{6.4} & \pct{82} \\
+BNB & \pct{5.0} & 2.84 & $-$\pct{2.0} & \pct{67} \\
+\midrule
+\textbf{多品种复合} & \textbf{\pct{7.1}} & \textbf{5.24} & $\mathbf{-}$\textbf{\pct{4.0}} & \pct{75} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textbf{Hummingbot 纸面部署制品。} 仓库 \texttt{trackB\_deploy/hummingbot/} 给出把
+上述 conv 信号搬到 Hummingbot 的脚本策略（资金费 carry 收敛）、配置（阈值同源于
+\texttt{config.py}）、\texttt{docker-compose} 与运行手册。Hummingbot 仅接 crypto 交易所，
+故 Track B 作为机制与部署节奏的类比验证层；真实下单先在 paper / testnet 验证。
+
 \section{关键发现与诚实局限}
 
 \begin{enumerate}\setlength\itemsep{2pt}
@@ -294,10 +335,12 @@ IM+1000ETF & 109 &  872 & \pct{75} & 3.30 \\
 \begin{itemize}\setlength\itemsep{1pt}
   \item \textbf{Track 0 精修}：分红季节性、动态 ETF、逐合约记账与基差 regime 识别已实现；
         下一步可把 regime 图形化并纳入月度监控；
-  \item \textbf{Track A（hftbacktest）}：合成盘口 proxy 已实现；下一步接入台内授权 L2 或自录
-        3 秒快照，并将 execution slippage 回灌到策略净值；
-  \item \textbf{Track B（Hummingbot）}：以现货--永续基差收敛作结构类比（crypto 免费纸面
-        交易），验证机制与部署节奏。
+  \item \textbf{Track A（hftbacktest）}：合成盘口 proxy、可插拔 \texttt{BookProvider} 真实
+        L2 摄入与 ETF 五档录制均已实现；剩股指期货完整五档（需券商 CTP 行情）与真实
+        hftbacktest 事件回放接入；
+  \item \textbf{Track B（Hummingbot）}：现货--永续基差回测已用真实币安公共行情跑出净值
+        （conv 复合 \pct{7.1}/夏普 5.24），Hummingbot 纸面部署制品已就绪；下一步在
+        paper/testnet 实跑挂机以校验开/平腿与资金费结算节奏。
 \end{itemize}
 
 \vspace{4pt}
