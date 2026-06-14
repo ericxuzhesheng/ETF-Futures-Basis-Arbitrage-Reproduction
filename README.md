@@ -148,10 +148,12 @@ src/
   contract_backtest.py         # 逐合约持有至交割 (严格记账, 无换月跳价)
   hft_execution.py             # Track A 执行撮合 (BookProvider 抽象: 合成/快照)
   l2_snapshot.py               # 真实/自录 L2 快照摄入 (depth-5 schema, parquet)
+  snapshot_recorder.py         # 实时盘口录制 (QuoteSource: tushare 五档)
   metrics.py                   # 年化/夏普/回撤/胜率/持仓周期
 track0_empirical/run_backtest.py   # 连续主力 + 锁定carry (近似, 含动态ETF)
 track0_empirical/run_contract.py   # 逐合约持有至交割 (严格)
 trackA_execution/run_hftbacktest_proxy.py # Track A hftbacktest-style 执行撮合
+trackA_execution/record_snapshots.py      # 交易时段录制真实 L2 快照
 results/                       # basis_summary_*.csv
 figures/                       # 净值 / 基差图
 report/                        # report.tex + report.pdf (XeLaTeX 中文报告)
@@ -162,7 +164,7 @@ report/                        # report.tex + report.pdf (XeLaTeX 中文报告)
 | 轨道 | 引擎 | 数据 | 状态 |
 | ---- | ---- | ---- | ---- |
 | **Track 0** | 纯 Python 实证 | tushare 真实 A 股 | ✅ 已完成（含动态 ETF） |
-| Track A | hftbacktest-style 撮合 + L2 摄入 | 合成盘口 / 自录 L2 快照 | ✅ 摄入层已接入 / 真实录制待补 |
+| Track A | hftbacktest-style 撮合 + L2 摄入/录制 | 合成盘口 / 自录 L2 快照 | ✅ 摄入+ETF录制已通 / 期货五档待CTP |
 | Track B | Hummingbot 现货–永续类比 | 免费 Binance 纸面交易 | 🔜 规划中 |
 
 > Hummingbot 接不了 SSE/SZSE，免费 A 股逐笔 L2 不可得；故 Track 0 是定量主体。
@@ -184,6 +186,22 @@ ask_px_1..5 / ask_sz_1..5    卖档 价/量
 券商终端导出或自录脚本只要落成这个格式即可接入，其余管线不变；运行
 `run_hftbacktest_proxy.py --use-snapshots` 即用快照撮合，并在 summary 报告
 `snapshot_fill_rate`（快照覆盖率，便于审计真实/合成混合回测）。
+
+**自录脚本** [`record_snapshots.py`](trackA_execution/record_snapshots.py) 在交易时段
+轮询实时盘口并写入上述 schema（可插拔 `QuoteSource`）：
+
+```bash
+# 单次抓拍，验证实时源映射（盘后会取上一交易日收盘五档）
+python trackA_execution/record_snapshots.py --etf 510300.SH --once
+# 连续录制至 15:00，每 3 秒采样一次
+python trackA_execution/record_snapshots.py --etf 510300.SH 510500.SH --interval 3 --until 15:00:05
+```
+
+- **ETF 腿**：tushare `realtime_quote`（sina）返回**完整五档**（B1..B5 / A1..A5），
+  量按 1 手 = 100 份换算成股数，现在即可录制。
+- **股指期货腿**：CFFEX 免费实时仅 1 档，完整五档需券商 CTP 行情；schema 容忍部分
+  档位（缺档置 0、深度自动跳过），CTP adapter 接同一 `QuoteSource` 协议即可。
+
 > 本课题为全新主题，不复现 Avellaneda–Stoikov 做市。
 
 ## ⚠️ 风险提示
