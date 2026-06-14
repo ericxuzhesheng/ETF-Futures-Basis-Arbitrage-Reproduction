@@ -1,0 +1,22 @@
+# Track B — spot/perp basis (funding) cash-and-carry config.
+# Mirrors config.SignalParams (conv) + config.CryptoCosts so the live/paper
+# strategy tracks trackB_deploy/run_basis_backtest.py.
+#
+# Edit values here, then in the Hummingbot client:  start --script spot_perp_basis_arb.py
+script_file_name: spot_perp_basis_arb.py
+
+# Connectors — keep both on PAPER until validated.
+spot_connector: binance_paper_trade
+perp_connector: binance_perpetual_testnet
+trading_pair: BTC-USDT
+
+# Sizing
+order_amount_usd: 500          # notional per leg (spot and perp matched)
+
+# Signal thresholds (annualised funding + premium), matching the backtest:
+#   conv_enter_rate = 0.03, conv_exit_rate = -0.005
+entry_rate: 0.03
+exit_rate: -0.005
+funding_per_year: 365
+min_spread_to_act: 0.0002
+tick_throttle_s: 15

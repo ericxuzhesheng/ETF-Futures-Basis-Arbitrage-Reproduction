@@ -194,7 +194,10 @@ def dividend_yield(index_code: str, tr_code: str, start: str, end: str | None,
         tr["trade_date"] = pd.to_datetime(tr["trade_date"])
         tr = tr.rename(columns={"close": "tr"}).sort_values("trade_date")
         m = px.merge(tr, on="trade_date", how="inner").sort_values("trade_date")
-        daily_div = m["tr"].pct_change() - m["px"].pct_change()
+        daily_div = (
+            m["tr"].pct_change(fill_method=None)
+            - m["px"].pct_change(fill_method=None)
+        )
         m["div_yield"] = daily_div.rolling(window, min_periods=window // 4) \
                                   .sum().clip(lower=0.0)
         m["div_yield"] = m["div_yield"].bfill()

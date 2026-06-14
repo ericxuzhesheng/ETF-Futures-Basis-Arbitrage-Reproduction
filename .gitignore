@@ -13,6 +13,16 @@ venv/
 data/*.parquet
 data/*.csv
 
+# Self-recorded L2 snapshots (Track A) — large, recorded locally
+data/snapshots/
+
+# Re-generable Track A child-order fills can become large with L2 data.
+results/trackA_execution_fills_*.csv
+
+# Hummingbot (Track B) runtime — logs/data/secrets generated in the container
+trackB_deploy/hummingbot/logs/
+trackB_deploy/hummingbot/data/
+
 # OS / editor
 .DS_Store
 .idea/

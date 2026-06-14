@@ -111,6 +111,51 @@ class SignalParams:
 
 SIGNALS = SignalParams()
 
+
+@dataclass(frozen=True)
+class RegimeParams:
+    """Basis-regime classifier parameters.
+
+    Regime labels:
+      +1  premium / contango: futures rich versus ETF/index spot
+      -1  discount / backwardation: futures cheap versus ETF/index spot
+       0  neutral: inside the no-trade band or not yet confirmed
+    """
+
+    enter_rate: float = 0.01      # annualised dividend-adjusted basis needed to confirm a side
+    exit_rate: float = 0.002      # hysteresis band; do not flip until basis crosses back inside
+    min_confirm_days: int = 3     # suppress one-day basis spikes around rolls/dividend dates
+    use_dividend_adjusted: bool = True
+
+
+REGIME = RegimeParams()
+
+
+@dataclass(frozen=True)
+class ExecutionParams:
+    """Track A execution-simulation parameters.
+
+    These are deliberately conservative defaults for a daily-data proxy of an
+    hftbacktest queue/fill model. Real L2 snapshots can replace the synthetic
+    book adapter without changing the runner output schema.
+    """
+
+    child_slices: int = 8
+    tick_size: float = 0.2
+    spread_ticks: int = 2
+    passive_depth_bps: float = 3.0
+    active_cross_bps: float = 1.5
+    queue_decay: float = 0.35
+    max_passive_wait_slices: int = 4
+    target_notional: float = 10_000_000.0
+    # Intraday time-of-day at which a recorded L2 session is sampled into the
+    # daily execution book (last snapshot at/before this time). Synthetic-book
+    # runs ignore it.
+    snapshot_sample_time: str = "14:55:00"
+
+
+EXECUTION = ExecutionParams()
+
 # Published benchmark numbers for side-by-side validation in the report.
 # 东证期货 (基差收敛, 动态ETF, 2018+):  年化收益 / 平均最大回撤 / 持仓周期≈40天
 REPORT_CONVERGENCE = {
@@ -127,3 +172,41 @@ REPORT_MEANREV = {
 REPORT_GALAXY_COMPOSITE = {"ann_return": 0.0657, "max_dd": -0.0337, "sharpe": 1.78}
 
 TRADING_DAYS = 244  # CFFEX/A股 年交易日近似
+
+
+# --------------------------------------------------------------------------- #
+# Track B — Binance 现货–永续 基差套利 (ETF–股指期货 的加密类比)
+# 现货 vs USDⓈ-M 永续: 多现货/空永续吃资金费 (永续的收敛机制), 类比期现 carry。
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class CryptoPair:
+    name: str          # 标签, e.g. "BTC"
+    spot_symbol: str   # 现货交易对, e.g. "BTCUSDT"
+    perp_symbol: str   # USDⓈ-M 永续交易对, e.g. "BTCUSDT"
+
+
+CRYPTO_PAIRS: tuple[CryptoPair, ...] = (
+    CryptoPair("BTC", "BTCUSDT", "BTCUSDT"),
+    CryptoPair("ETH", "ETHUSDT", "ETHUSDT"),
+    CryptoPair("BNB", "BNBUSDT", "BNBUSDT"),
+)
+
+
+@dataclass(frozen=True)
+class CryptoCosts:
+    """Binance round-trip costs (taker 偏保守, 限价/VIP 实际更低)."""
+
+    spot_fee: float = 0.0010    # 现货 taker 单边
+    perp_fee: float = 0.0004    # 永续 taker 单边
+    slippage: float = 0.0002    # 成交滑点
+    rf: float = 0.0             # 闲置 USDT 计息 (保守取 0)
+
+    @property
+    def exec_one_way(self) -> float:
+        """两腿单边执行成本 (开/平各计一次)."""
+        return self.spot_fee + self.perp_fee + self.slippage
+
+
+CRYPTO_COSTS = CryptoCosts()
+CRYPTO_DAYS = 365                 # 加密 7×24, 全年计息/年化
+BACKTEST_START_CRYPTO = "20200101"  # BTCUSDT 永续 2019-09 上线, 取 2020 起稳态

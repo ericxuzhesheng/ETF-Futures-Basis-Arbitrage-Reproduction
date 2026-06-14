@@ -36,6 +36,7 @@ from config import (  # noqa: E402
 )
 from src import data_tushare as dt  # noqa: E402
 from src import basis_model, metrics  # noqa: E402
+from src.regime import identify_basis_regime, regime_summary  # noqa: E402
 from src.signal import (  # noqa: E402
     convergence_position, galaxy_percentile_position, orient_zscore_position,
 )
@@ -60,8 +61,10 @@ def _attach_spot_leg(df: pd.DataFrame, pair, start: str, end: str | None,
         out["etf_chosen"] = sel["chosen"].reindex(out.index)
         out.attrs["n_switches"] = int((sel["chosen"] != sel["chosen"].shift()).sum())
     else:
-        out["track_excess"] = (out["etf_adj_close"].pct_change()
-                               - out["spot"].pct_change()).fillna(0.0)
+        out["track_excess"] = (
+            out["etf_adj_close"].pct_change(fill_method=None)
+            - out["spot"].pct_change(fill_method=None)
+        ).fillna(0.0)
         out["etf_chosen"] = pair.etf_code
         out.attrs["n_switches"] = 0
     return out
@@ -104,6 +107,7 @@ def run_pair(pair, start: str, end: str | None, signals, dynamic: bool = False) 
     pstart = max(start, pair.start_date)
     raw = dt.load_pair(pair, pstart, end)
     df = basis_model.with_basis_columns(raw, rf=COSTS.rf).set_index("trade_date")
+    df = identify_basis_regime(df)
     df = _attach_spot_leg(df, pair, pstart, end, dynamic)
 
     results = {"pair": pair.name, "rows": len(df), "n_switches": df.attrs.get("n_switches", 0),
@@ -118,6 +122,7 @@ def run_pair(pair, start: str, end: str | None, signals, dynamic: bool = False) 
         m = metrics.summarize(net, pos.shift(1).fillna(0), rf=COSTS.rf)
         results[label] = m
     results["_nets"] = nets  # kept for composite, stripped before JSON dump
+    results["_regime"] = regime_summary(df, pair.name)
     return results
 
 
@@ -127,7 +132,8 @@ def build_composite(per_pair: list[dict]) -> dict:
     aligned = pd.concat(series, axis=1).fillna(0.0)
     composite = aligned.mean(axis=1)
     # exposure-style position proxy: nonzero if any leg active
-    active = (pd.concat([(s != 0) for s in series], axis=1).fillna(False)
+    active = (pd.concat([(s != 0) for s in series], axis=1)
+              .reindex(aligned.index, fill_value=False)
               .any(axis=1).astype(int))
     return metrics.summarize(composite, active, rf=COSTS.rf)
 
@@ -197,6 +203,11 @@ def main() -> None:
     csv_path = RESULTS / f"basis_summary_{suffix}.csv"
     out.to_csv(csv_path, index=False, encoding="utf-8-sig")
     print(f"[saved] {csv_path}")
+
+    regime_path = RESULTS / f"basis_regime_{suffix}.csv"
+    pd.concat([r["_regime"] for r in per_pair], ignore_index=True) \
+        .to_csv(regime_path, index=False, encoding="utf-8-sig")
+    print(f"[saved] {regime_path}")
 
     compare_fixed_dynamic(args.start, args.end, signals)
 

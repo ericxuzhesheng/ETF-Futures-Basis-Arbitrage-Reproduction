@@ -53,14 +53,14 @@ def run_pair(pair, start: str, end: str | None, signals=SIGNALS) -> dict:
         g = g.sort_values("trade_date").set_index("trade_date")
         fut_by_c[c] = g["fut_close"]
         dte_by_c[c] = g["dte"]
-        ret_by_c[c] = g["fut_close"].pct_change()
+        ret_by_c[c] = g["fut_close"].pct_change(fill_method=None)
     # Front contract per date = smallest dte at/above the entry floor.
     front = (panel[panel["dte"] >= CONTRACT_ENTRY_MIN_DTE]
              .sort_values(["trade_date", "dte"])
              .groupby("trade_date").first())  # columns: contract, fut_close, dte
 
     dates = base.index
-    r_etf = base["etf_adj_close"].pct_change()
+    r_etf = base["etf_adj_close"].pct_change(fill_method=None)
     spot = base["spot"]
     divy = base["div_yield"]
 

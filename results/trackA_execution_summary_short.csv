@@ -1,0 +1,5 @@
+﻿pair,orders,child_fills,cross_rate,mean_slippage_bps,p95_slippage_bps,snapshot_fill_rate,param_child_slices,param_tick_size,param_spread_ticks,param_passive_depth_bps,param_active_cross_bps,param_queue_decay,param_max_passive_wait_slices,param_target_notional,param_snapshot_sample_time,span,position_changes
+IH+50ETF,66,528,0.75,3.526818701364635,4.392857142857196,0.0,8,0.2,2,3.0,1.5,0.35,4,10000000.0,14:55:00,2024-01-02..2026-06-12,66
+IF+300ETF,69,552,0.75,3.2665781976168007,4.109718919579315,0.0,8,0.2,2,3.0,1.5,0.35,4,10000000.0,14:55:00,2024-01-02..2026-06-12,69
+IC+500ETF,72,576,0.75,3.1727683231579373,4.066941633360024,0.0,8,0.2,2,3.0,1.5,0.35,4,10000000.0,14:55:00,2024-01-02..2026-06-12,72
+IM+1000ETF,41,328,0.75,3.2134504153242545,4.151084054952397,0.0,8,0.2,2,3.0,1.5,0.35,4,10000000.0,14:55:00,2024-01-02..2026-06-12,41

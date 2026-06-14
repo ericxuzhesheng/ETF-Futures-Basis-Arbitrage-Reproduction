@@ -1,0 +1,27 @@
+# Track B — Hummingbot paper-trading runtime.
+#
+#   docker compose up -d        # start
+#   docker attach hummingbot    # open the client (Ctrl-P Ctrl-Q to detach)
+#
+# The script + config below are mounted into the container's expected paths so
+# the strategy is available as `start --script spot_perp_basis_arb.py`.
+services:
+  hummingbot:
+    container_name: hummingbot
+    image: hummingbot/hummingbot:latest
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    network_mode: host
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./scripts:/home/hummingbot/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+    environment:
+      - CONFIG_PASSWORD=${HB_PASSWORD:-}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

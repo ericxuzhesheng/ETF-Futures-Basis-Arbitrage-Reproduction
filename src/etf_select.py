@@ -34,7 +34,7 @@ def select(candidates: tuple[str, ...], index_df: pd.DataFrame,
     index_df has [trade_date, spot]. track_excess = r_chosen - r_index.
     """
     idx = index_df[["trade_date", "spot"]].copy()
-    idx["r_index"] = idx["spot"].pct_change()
+    idx["r_index"] = idx["spot"].pct_change(fill_method=None)
 
     # Build aligned per-candidate panels.
     closes, amounts, prems = {}, {}, {}
@@ -47,7 +47,7 @@ def select(candidates: tuple[str, ...], index_df: pd.DataFrame,
     close_df = pd.DataFrame(closes)
     amt_df = pd.DataFrame(amounts)
     prem_df = pd.DataFrame(prems)
-    ret_df = close_df.pct_change()
+    ret_df = close_df.pct_change(fill_method=None)
     r_index = idx.set_index("trade_date")["r_index"].reindex(close_df.index)
 
     # Single candidate -> degenerate (e.g. 上证50).

@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 
 from config import SignalParams
+from src.regime import identify_basis_regime
 
 
 def _rolling_percentile_rank(s: pd.Series, window: int) -> pd.Series:
@@ -36,7 +37,10 @@ def convergence_position(df: pd.DataFrame, p: SignalParams) -> pd.Series:
     until the basis decays below the exit rate. Mirror to -1 for 贴水 only when
     融券 is allowed.
     """
+    if "regime" not in df.columns:
+        df = identify_basis_regime(df)
     rate = df["basis_rate"].to_numpy()
+    regime = df["regime"].to_numpy()
     pos = np.zeros(len(df), dtype=int)
     state = 0
     for i, r in enumerate(rate):
@@ -44,9 +48,9 @@ def convergence_position(df: pd.DataFrame, p: SignalParams) -> pd.Series:
             pos[i] = state
             continue
         if state == 0:
-            if r >= p.conv_enter_rate:
+            if regime[i] == 1 and r >= p.conv_enter_rate:
                 state = 1
-            elif r <= -p.conv_enter_rate and p.allow_short_etf:
+            elif regime[i] == -1 and r <= -p.conv_enter_rate and p.allow_short_etf:
                 state = -1
         # Hold the entire 升水/贴水 regime: exit only when the (dividend-adjusted)
         # basis crosses through zero against the position. Low turnover (~报告 40d)
@@ -65,8 +69,11 @@ def galaxy_percentile_position(df: pd.DataFrame, p: SignalParams) -> pd.Series:
     >enter_high_pct -> 正向 (+1) but only while basis>0; <enter_low_pct -> 反向
     (-1) only if allow_short_etf. Exit toward the median.
     """
+    if "regime" not in df.columns:
+        df = identify_basis_regime(df)
     rank = _rolling_percentile_rank(df["basis_rate"], p.percentile_window).to_numpy()
     rate = df["basis_rate"].to_numpy()
+    regime = df["regime"].to_numpy()
     pos = np.zeros(len(df), dtype=int)
     state = 0
     for i in range(len(df)):
@@ -75,9 +82,9 @@ def galaxy_percentile_position(df: pd.DataFrame, p: SignalParams) -> pd.Series:
             pos[i] = state
             continue
         if state == 0:
-            if r >= p.enter_high_pct and br > 0:
+            if r >= p.enter_high_pct and regime[i] == 1 and br > 0:
                 state = 1
-            elif r <= p.enter_low_pct and br < 0 and p.allow_short_etf:
+            elif r <= p.enter_low_pct and regime[i] == -1 and br < 0 and p.allow_short_etf:
                 state = -1
         elif state == 1 and (r <= p.exit_pct or br <= 0):
             state = 0
@@ -89,11 +96,14 @@ def galaxy_percentile_position(df: pd.DataFrame, p: SignalParams) -> pd.Series:
 
 def orient_zscore_position(df: pd.DataFrame, p: SignalParams) -> pd.Series:
     """东证式 均值回归 z-score, gated to positive-carry when 融券 disabled."""
+    if "regime" not in df.columns:
+        df = identify_basis_regime(df)
     s = df["basis_rate"]
     mean = s.rolling(p.zscore_window, min_periods=p.zscore_window // 2).mean()
     std = s.rolling(p.zscore_window, min_periods=p.zscore_window // 2).std()
     z = ((s - mean) / std).to_numpy()
     rate = s.to_numpy()
+    regime = df["regime"].to_numpy()
     pos = np.zeros(len(df), dtype=int)
     state = 0
     for i in range(len(df)):
@@ -102,9 +112,9 @@ def orient_zscore_position(df: pd.DataFrame, p: SignalParams) -> pd.Series:
             pos[i] = state
             continue
         if state == 0:
-            if zi >= p.z_enter and br > 0:
+            if zi >= p.z_enter and regime[i] == 1 and br > 0:
                 state = 1
-            elif zi <= -p.z_enter and br < 0 and p.allow_short_etf:
+            elif zi <= -p.z_enter and regime[i] == -1 and br < 0 and p.allow_short_etf:
                 state = -1
         elif abs(zi) <= p.z_exit:
             state = 0
