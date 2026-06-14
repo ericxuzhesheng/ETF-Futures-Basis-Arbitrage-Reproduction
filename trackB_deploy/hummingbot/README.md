@@ -51,4 +51,8 @@ docker attach hummingbot
 - **本部署制品**:把同一信号搬到 Hummingbot 实时撮合,验证开/平腿、资金费结算、
   挂机节奏。两者阈值同源,便于回测—实盘对照。
 
+> ⚠️ **API 版本兼容**:脚本按 Hummingbot 脚本策略接口编写,但未固定到具体版本。
+> `get_funding_info().rate`、`PositionAction`、`buy/sell(..., position_action=...)` 等在不同
+> Hummingbot 版本可能有差异;若 `start` 时报 AttributeError/TypeError,按所装版本微调。
+
 > 真实实盘需自担风险与合规审查;永续合约有强平风险,务必先 testnet 验证保证金与强平逻辑。
