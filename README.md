@@ -131,7 +131,8 @@ cp .env.example .env          # 填入你自己的 TUSHARE_TOKEN (.env 已 gitig
 python track0_empirical/run_backtest.py --start 20190101 --allow-short            # 复现报告
 python track0_empirical/run_backtest.py --start 20190101 --allow-short --dynamic  # 动态ETF
 python track0_empirical/run_backtest.py --start 20190101                          # 融券受限
-python trackA_execution/run_hftbacktest_proxy.py --start 20190101 --allow-short    # Track A 执行撮合
+python trackA_execution/run_hftbacktest_proxy.py --start 20190101 --allow-short    # Track A 合成盘口
+python trackA_execution/run_hftbacktest_proxy.py --start 20190101 --allow-short --use-snapshots  # Track A 真实/自录 L2
 python make_figures.py                                                            # 出图
 ```
 
@@ -145,6 +146,8 @@ src/
   signal.py                    # conv / galaxy / orient 三种因果信号
   etf_select.py                # 动态 ETF 择优 (流动性/跟踪误差)
   contract_backtest.py         # 逐合约持有至交割 (严格记账, 无换月跳价)
+  hft_execution.py             # Track A 执行撮合 (BookProvider 抽象: 合成/快照)
+  l2_snapshot.py               # 真实/自录 L2 快照摄入 (depth-5 schema, parquet)
   metrics.py                   # 年化/夏普/回撤/胜率/持仓周期
 track0_empirical/run_backtest.py   # 连续主力 + 锁定carry (近似, 含动态ETF)
 track0_empirical/run_contract.py   # 逐合约持有至交割 (严格)
@@ -159,11 +162,28 @@ report/                        # report.tex + report.pdf (XeLaTeX 中文报告)
 | 轨道 | 引擎 | 数据 | 状态 |
 | ---- | ---- | ---- | ---- |
 | **Track 0** | 纯 Python 实证 | tushare 真实 A 股 | ✅ 已完成（含动态 ETF） |
-| Track A | hftbacktest-style 撮合 proxy | 合成盘口；台内 L2 / 自录快照待接入 | ✅ proxy 已实现 / L2 待完成 |
+| Track A | hftbacktest-style 撮合 + L2 摄入 | 合成盘口 / 自录 L2 快照 | ✅ 摄入层已接入 / 真实录制待补 |
 | Track B | Hummingbot 现货–永续类比 | 免费 Binance 纸面交易 | 🔜 规划中 |
 
 > Hummingbot 接不了 SSE/SZSE，免费 A 股逐笔 L2 不可得；故 Track 0 是定量主体。
-> Track A 已提供 hftbacktest-style 撮合 proxy，真实 L2 回放待接入；Track B 为部署节奏类比。
+> Track A 的盘口已抽象为可插拔 `BookProvider`：默认合成盘口，`--use-snapshots`
+> 切换到真实/自录 L2 快照（缺失自动降级合成），真实快照按券商/自录脚本落地即用；
+> Track B 为部署节奏类比。
+
+### 📥 Track A L2 快照接入
+
+自录快照按一品种一会话一份 parquet 落到
+`data/snapshots/<合约代码>/<YYYYMMDD>.parquet`，标准 depth-5 schema：
+
+```text
+ts                       盘中时间戳 (datetime64)
+bid_px_1..5 / bid_sz_1..5    买档 价/量 (level 1 = 最优)
+ask_px_1..5 / ask_sz_1..5    卖档 价/量
+```
+
+券商终端导出或自录脚本只要落成这个格式即可接入，其余管线不变；运行
+`run_hftbacktest_proxy.py --use-snapshots` 即用快照撮合，并在 summary 报告
+`snapshot_fill_rate`（快照覆盖率，便于审计真实/合成混合回测）。
 > 本课题为全新主题，不复现 Avellaneda–Stoikov 做市。
 
 ## ⚠️ 风险提示

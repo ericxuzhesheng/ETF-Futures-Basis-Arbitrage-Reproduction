@@ -148,6 +148,10 @@ class ExecutionParams:
     queue_decay: float = 0.35
     max_passive_wait_slices: int = 4
     target_notional: float = 10_000_000.0
+    # Intraday time-of-day at which a recorded L2 session is sampled into the
+    # daily execution book (last snapshot at/before this time). Synthetic-book
+    # runs ignore it.
+    snapshot_sample_time: str = "14:55:00"
 
 
 EXECUTION = ExecutionParams()
