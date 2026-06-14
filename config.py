@@ -172,3 +172,41 @@ REPORT_MEANREV = {
 REPORT_GALAXY_COMPOSITE = {"ann_return": 0.0657, "max_dd": -0.0337, "sharpe": 1.78}
 
 TRADING_DAYS = 244  # CFFEX/A股 年交易日近似
+
+
+# --------------------------------------------------------------------------- #
+# Track B — Binance 现货–永续 基差套利 (ETF–股指期货 的加密类比)
+# 现货 vs USDⓈ-M 永续: 多现货/空永续吃资金费 (永续的收敛机制), 类比期现 carry。
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class CryptoPair:
+    name: str          # 标签, e.g. "BTC"
+    spot_symbol: str   # 现货交易对, e.g. "BTCUSDT"
+    perp_symbol: str   # USDⓈ-M 永续交易对, e.g. "BTCUSDT"
+
+
+CRYPTO_PAIRS: tuple[CryptoPair, ...] = (
+    CryptoPair("BTC", "BTCUSDT", "BTCUSDT"),
+    CryptoPair("ETH", "ETHUSDT", "ETHUSDT"),
+    CryptoPair("BNB", "BNBUSDT", "BNBUSDT"),
+)
+
+
+@dataclass(frozen=True)
+class CryptoCosts:
+    """Binance round-trip costs (taker 偏保守, 限价/VIP 实际更低)."""
+
+    spot_fee: float = 0.0010    # 现货 taker 单边
+    perp_fee: float = 0.0004    # 永续 taker 单边
+    slippage: float = 0.0002    # 成交滑点
+    rf: float = 0.0             # 闲置 USDT 计息 (保守取 0)
+
+    @property
+    def exec_one_way(self) -> float:
+        """两腿单边执行成本 (开/平各计一次)."""
+        return self.spot_fee + self.perp_fee + self.slippage
+
+
+CRYPTO_COSTS = CryptoCosts()
+CRYPTO_DAYS = 365                 # 加密 7×24, 全年计息/年化
+BACKTEST_START_CRYPTO = "20200101"  # BTCUSDT 永续 2019-09 上线, 取 2020 起稳态

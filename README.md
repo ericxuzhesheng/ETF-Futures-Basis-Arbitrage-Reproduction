@@ -149,11 +149,14 @@ src/
   hft_execution.py             # Track A 执行撮合 (BookProvider 抽象: 合成/快照)
   l2_snapshot.py               # 真实/自录 L2 快照摄入 (depth-5 schema, parquet)
   snapshot_recorder.py         # 实时盘口录制 (QuoteSource: tushare 五档)
+  data_binance.py              # Track B 币安现货/永续/资金费取数 (免密钥公共行情)
+  crypto_backtest.py           # Track B 现货-永续 cash-and-carry 实现 P&L (365年化)
   metrics.py                   # 年化/夏普/回撤/胜率/持仓周期
 track0_empirical/run_backtest.py   # 连续主力 + 锁定carry (近似, 含动态ETF)
 track0_empirical/run_contract.py   # 逐合约持有至交割 (严格)
 trackA_execution/run_hftbacktest_proxy.py # Track A hftbacktest-style 执行撮合
 trackA_execution/record_snapshots.py      # 交易时段录制真实 L2 快照
+trackB_deploy/run_basis_backtest.py       # Track B 币安现货-永续 基差回测
 results/                       # basis_summary_*.csv
 figures/                       # 净值 / 基差图
 report/                        # report.tex + report.pdf (XeLaTeX 中文报告)
@@ -165,12 +168,13 @@ report/                        # report.tex + report.pdf (XeLaTeX 中文报告)
 | ---- | ---- | ---- | ---- |
 | **Track 0** | 纯 Python 实证 | tushare 真实 A 股 | ✅ 已完成（含动态 ETF） |
 | Track A | hftbacktest-style 撮合 + L2 摄入/录制 | 合成盘口 / 自录 L2 快照 | ✅ 摄入+ETF录制已通 / 期货五档待CTP |
-| Track B | Hummingbot 现货–永续类比 | 免费 Binance 纸面交易 | 🔜 规划中 |
+| Track B | 现货–永续 基差回测 + Hummingbot 部署 | 免费 Binance 公共行情 | ✅ 基差回测已完成 / Hummingbot 制品待补 |
 
 > Hummingbot 接不了 SSE/SZSE，免费 A 股逐笔 L2 不可得；故 Track 0 是定量主体。
 > Track A 的盘口已抽象为可插拔 `BookProvider`：默认合成盘口，`--use-snapshots`
-> 切换到真实/自录 L2 快照（缺失自动降级合成），真实快照按券商/自录脚本落地即用；
-> Track B 为部署节奏类比。
+> 切换到真实/自录 L2 快照（缺失自动降级合成），真实快照按券商/自录脚本落地即用。
+> Track B 把币安**现货 vs USDⓈ-M 永续**作为期现基差的加密类比（永续 carry = 资金费），
+> 复用 Track 0 三信号在免费公共行情上跑出真实净值；Hummingbot 纸面部署制品待补。
 
 ### 📥 Track A L2 快照接入
 
@@ -201,6 +205,31 @@ python trackA_execution/record_snapshots.py --etf 510300.SH 510500.SH --interval
   量按 1 手 = 100 份换算成股数，现在即可录制。
 - **股指期货腿**：CFFEX 免费实时仅 1 档，完整五档需券商 CTP 行情；schema 容忍部分
   档位（缺档置 0、深度自动跳过），CTP adapter 接同一 `QuoteSource` 协议即可。
+
+### 🪙 Track B — 币安现货–永续 基差回测（加密类比）
+
+期现套利在加密市场的等价物是 **现货 vs USDⓈ-M 永续** 的 cash-and-carry：多现货 /
+空永续，靠**资金费**(funding，永续的收敛机制，每 8h 结算) 吃 carry。数据全部来自
+币安免费公共行情(现货/永续 K 线 + 资金费历史，免密钥)，复用 Track 0 的 conv /
+galaxy / orient 三信号；P&L 用真实 `(现货收益 − 永续收益 + 资金费)` **逐日实现，无
+锁定 carry 假设**(加密三腿数据完整，比 Track 0 更硬)。
+
+仅正 carry(多现货/空永续，2021–2026，费后):
+
+| 品种 | conv 年化 | 夏普 | 最大回撤 | 胜率 |
+| ---- | --------: | ---: | -------: | ---: |
+| BTC | 7.4% | 5.03 | −6.0% | 83% |
+| ETH | 8.9% | 5.19 | −6.4% | 82% |
+| BNB | 5.0% | 2.84 | −2.0% | 67% |
+| **复合** | **7.1%** | **5.24** | **−4.0%** | 75% |
+
+资金费 carry 的低波动/高夏普特征(夏普≈5)与 A 股期现正向套利一致;放开双向(含负资金费
+做空现货)后复合年化升至 **8.3%**、夏普 **5.77**。
+
+```bash
+python trackB_deploy/run_basis_backtest.py --start 20210101              # 仅正carry
+python trackB_deploy/run_basis_backtest.py --start 20210101 --allow-short # 双向
+```
 
 > 本课题为全新主题，不复现 Avellaneda–Stoikov 做市。
 
