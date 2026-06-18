@@ -146,16 +146,44 @@ ETF 套利有结构性错配——\textbf{Hummingbot 只能接加密交易所，
 而是\textbf{高度依赖融券资源}。对自营台的现实含义——这策略能不能做，取决于\textbf{能不能借到券}，
 而不只是基差信号好不好看。正好印证华泰柏瑞``融券约束制约反向套利''。
 
-\section*{5\quad 两个执行验证层（1.5 分钟）}
+\section*{5\quad 两个执行验证层（2 分钟，主动讲清局限）}
+\noindent\textbf{先说定位}：Track 0 是定量主体，已用真实 A 股数据复现了研报数值。Track A 和 B 是
+\textbf{执行与部署的验证层}，回答``信号能不能落地撮合''，但\textbf{都还没到真实环境实跑}——下面
+我主动把局限讲清楚。
+
 \textbf{Track A：执行撮合}\cue{表 8 + 图 5}。hftbacktest 风格的执行 proxy：每次调仓拆 8 个子单，
 模拟被动排队、超时吃价、双腿滑点。执行成本逐日回灌后，复合年化从 5.6\% 降到 \textbf{4.6\%}、夏普
-1.94 降到 1.39。\textbf{执行成本拖累可量化}。盘口已抽象成可插拔接口，ETF 五档现在用 tushare 已能录，
-股指期货完整五档等券商 CTP。
+1.94 降到 1.39——\textbf{执行成本拖累可量化}。
+\textbf{局限（要主动说）}：
+\begin{itemize}
+  \item 这套撮合跑在\textbf{合成盘口}上，是日频数据的 proxy，\textbf{不是真实 hftbacktest 事件级
+        回放}；所以 4.6\% 这个数是``合成盘口下的执行成本估计'',量级可信、绝对值待验证。
+  \item 根因是\textbf{免费可回溯的 A 股逐笔 L2 实际不存在}——交易所 L2 要付费授权，
+        AkShare/QMT 的``tick''其实是 3 秒快照。这是数据约束，不是没做。
+  \item 现状：盘口已抽象成\textbf{可插拔接口}，\textbf{ETF 五档现在用 tushare 已经能录}（实测能抓
+        510300/510500 真实五档），但\textbf{股指期货完整五档要券商 CTP 行情，还没接}。
+  \item \textbf{下一步}：接 CTP 五档 $+$ 真实 L2 事件回放，把合成盘口换成真盘口。
+\end{itemize}
 
 \textbf{Track B：币安现货--永续}\cue{表 9 + 图 6}。期现套利在加密市场的等价物——\textbf{现货 vs
 永续}的 cash-and-carry，靠\textbf{资金费}吃 carry，对应 A 股``多 ETF、空期货''。数据全是币安免费
-公共行情，复用同一套信号。复合年化 7.1\%、夏普 5.24。资金费 carry 的\textbf{低波动高夏普}和 A 股
-正向套利一致——跨市场相互印证。配套给了 Hummingbot 纸面部署制品。
+公共行情，复用同一套信号，复合年化 7.1\%、夏普 5.24，\textbf{低波动高夏普}和 A 股正向套利一致——
+跨市场相互印证。
+\textbf{局限（要主动说）}：
+\begin{itemize}
+  \item 它是\textbf{类比，不是 A 股本身}。之所以用加密，是因为任务点名要 Hummingbot，而
+        \textbf{Hummingbot 只能接加密交易所、连不了上交所深交所}——所以它验证的是机制和部署
+        节奏，不能替代 A 股复现。
+  \item \textbf{信号口径有量纲差异}：Track B 的 basis\_rate $=$ 年化资金费 $+$ premium，premium 是
+        瞬时点位水平（量级小、日内回归），carry 由资金费主导；Track 0 用的是含 $dte$ 的年化基差率。
+        二者属\textbf{类比近似}，不是严格等价。
+  \item 收敛机制也不同：永续靠\textbf{每 8 小时结算的资金费}收敛，A 股靠\textbf{到期交割}收敛。
+  \item Hummingbot 目前是\textbf{纸面部署制品}（脚本$+$配置$+$docker$+$手册），\textbf{还没在
+        paper/testnet 真正挂机实跑}。\textbf{下一步}就是实跑，校验开/平腿和资金费结算节奏。
+\end{itemize}
+
+\noindent\textbf{一句话收}：两条验证层把``信号$\to$撮合$\to$部署''的链路打通到了接口就绪，
+但\textbf{Track A 缺真实 L2、Track B 缺真实挂机}，这是目前最诚实的两个边界。
 
 \section*{6\quad 关键发现与局限（45 秒）\quad \cue{第 4 节}}
 四条，前两条是发现、后两条是主动说的局限：
